@@ -138,6 +138,7 @@ async function run() {
       actionsUtil.getOptionalInput("queries"),
       actionsUtil.getOptionalInput("config-file"),
       actionsUtil.getOptionalInput("db-location"),
+      actionsUtil.getOptionalInput("upload-dbs") === "true",
       parseRepositoryNwo(actionsUtil.getRequiredEnvParam("GITHUB_REPOSITORY")),
       actionsUtil.getTemporaryDirectory(),
       actionsUtil.getRequiredEnvParam("RUNNER_TOOL_CACHE"),

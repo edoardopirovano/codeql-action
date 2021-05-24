@@ -114,6 +114,10 @@ export interface Config {
    * The location where CodeQL databases should be stored.
    */
   dbLocation: string;
+  /**
+   * Whether or not to upload the CodeQL databases created.
+   */
+  uploadDbs: boolean;
 }
 
 /**
@@ -744,6 +748,7 @@ export async function getDefaultConfig(
   languagesInput: string | undefined,
   queriesInput: string | undefined,
   dbLocation: string | undefined,
+  uploadDbs: boolean,
   repository: RepositoryNwo,
   tempDir: string,
   toolCacheDir: string,
@@ -791,6 +796,7 @@ export async function getDefaultConfig(
     codeQLCmd: codeQL.getPath(),
     gitHubVersion,
     dbLocation: dbLocationOrDefault(dbLocation, tempDir),
+    uploadDbs,
   };
 }
 
@@ -802,6 +808,7 @@ async function loadConfig(
   queriesInput: string | undefined,
   configFile: string,
   dbLocation: string | undefined,
+  uploadDbs: boolean,
   repository: RepositoryNwo,
   tempDir: string,
   toolCacheDir: string,
@@ -948,6 +955,7 @@ async function loadConfig(
     codeQLCmd: codeQL.getPath(),
     gitHubVersion,
     dbLocation: dbLocationOrDefault(dbLocation, tempDir),
+    uploadDbs,
   };
 }
 
@@ -969,6 +977,7 @@ export async function initConfig(
   queriesInput: string | undefined,
   configFile: string | undefined,
   dbLocation: string | undefined,
+  uploadDbs: boolean,
   repository: RepositoryNwo,
   tempDir: string,
   toolCacheDir: string,
@@ -987,6 +996,7 @@ export async function initConfig(
       languagesInput,
       queriesInput,
       dbLocation,
+      uploadDbs,
       repository,
       tempDir,
       toolCacheDir,
@@ -1002,6 +1012,7 @@ export async function initConfig(
       queriesInput,
       configFile,
       dbLocation,
+      uploadDbs,
       repository,
       tempDir,
       toolCacheDir,

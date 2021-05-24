@@ -61,6 +61,7 @@ jobs:
     - uses: ./../action/init
       with:
         db-location: "${{ runner.temp }}/customDbLocation"
+        upload-dbs: true
     - name: Build code
       shell: bash
       run: ./build.sh

@@ -196,6 +196,7 @@ program
         cmd.queries,
         cmd.configFile,
         undefined,
+        false,
         parseRepositoryNwo(cmd.repository),
         tempDir,
         toolsDir,
