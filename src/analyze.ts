@@ -414,6 +414,7 @@ async function injectLinesOfCode(
   language: Language,
   locPromise: Promise<Partial<Record<Language, number>>>
 ) {
+  return;
   const lineCounts = await locPromise;
   const idPrefix = getIdPrefix(language);
   if (language in lineCounts) {
