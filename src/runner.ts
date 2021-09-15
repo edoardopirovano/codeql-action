@@ -6,7 +6,7 @@ import { Command } from "commander";
 
 import { runFinalize, runQueries } from "./analyze";
 import { determineAutobuildLanguage, runAutobuild } from "./autobuild";
-import { CodeQL, getCodeQL } from "./codeql";
+import { CodeQL, CODEQL_VERSION_NEW_TRACING, getCodeQL } from "./codeql";
 import { Config, getConfig } from "./config-utils";
 import { initCodeQL, initConfig, injectWindowsTracer, runInit } from "./init";
 import { Language, parseLanguage } from "./languages";
@@ -23,6 +23,7 @@ import {
   getGitHubAuth,
   initializeEnvironment,
   Mode,
+  codeQlVersionAbove,
 } from "./util";
 
 // eslint-disable-next-line import/no-commonjs
@@ -226,12 +227,21 @@ program
       );
 
       const sourceRoot = checkoutPath;
-      const tracerConfig = await runInit(codeql, config, sourceRoot);
+      const tracerConfig = await runInit(
+        codeql,
+        config,
+        sourceRoot,
+        parseTraceProcessName(),
+        parseTraceProcessLevel()
+      );
       if (tracerConfig === undefined) {
         return;
       }
 
-      if (process.platform === "win32") {
+      if (
+        process.platform === "win32" &&
+        !(await codeQlVersionAbove(codeql, CODEQL_VERSION_NEW_TRACING))
+      ) {
         await injectWindowsTracer(
           parseTraceProcessName(),
           parseTraceProcessLevel(),

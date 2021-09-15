@@ -422,19 +422,6 @@ enum EnvVar {
    * not the cli.
    */
   FEATURE_WILL_UPLOAD = "CODEQL_ACTION_FEATURE_WILL_UPLOAD",
-
-  /**
-   * If set to the "true" string, then the codeql-action is using its
-   * own deprecated and non-standard way of scanning for multiple
-   * languages.
-   */
-  FEATURE_MULTI_LANGUAGE = "CODEQL_ACTION_FEATURE_MULTI_LANGUAGE",
-
-  /**
-   * If set to the "true" string, then the codeql-action is using its
-   * own sandwiched workflow mechanism
-   */
-  FEATURE_SANDWICH = "CODEQL_ACTION_FEATURE_SANDWICH",
 }
 
 export function initializeEnvironment(mode: Mode, version: string) {
@@ -450,8 +437,6 @@ export function initializeEnvironment(mode: Mode, version: string) {
   exportVar(EnvVar.VERSION, version);
   exportVar(EnvVar.FEATURE_SARIF_COMBINE, "true");
   exportVar(EnvVar.FEATURE_WILL_UPLOAD, "true");
-  exportVar(EnvVar.FEATURE_MULTI_LANGUAGE, "true");
-  exportVar(EnvVar.FEATURE_SANDWICH, "true");
 }
 
 export function getMode(): Mode {
