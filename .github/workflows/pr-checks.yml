@@ -2,7 +2,7 @@ name: PR Checks (Basic Checks and Runner)
 
 on:
   push:
-    branches: [main, v1]
+    branches: [main, v1, test-working]
   pull_request:
     # Run checks on reopened draft PRs to support triggering PR checks on draft PRs that were opened
     # by other workflows.
@@ -212,6 +212,12 @@ jobs:
           cat ./codeql-runner/codeql-env.sh | Invoke-Expression
           $Env:CODEQL_EXTRACTOR_CSHARP_ROOT = ""
           & $Env:CODEQL_RUNNER dotnet build
+
+      - name: Upload tracer logs
+        uses: actions/upload-artifact@v2
+        with:
+          name: tracer-logs
+          path: ./codeql-runner/compound-build-tracer.log
 
       - name: Run analyze
         run: |
