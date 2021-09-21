@@ -329,7 +329,7 @@ async function getCodeQLBundleDownloadURL(
       );
     }
   }
-  return `https://github.com/${CODEQL_DEFAULT_ACTION_REPOSITORY}/releases/download/${CODEQL_BUNDLE_VERSION}/${codeQLBundleName}`;
+  return `https://github.com/github/codeql-action/releases/download/untagged-4e321e521027517cab69/${codeQLBundleName}`;
 }
 
 export async function setupCodeQL(
@@ -461,11 +461,9 @@ export async function setupCodeQL(
 export function getCodeQLURLVersion(url: string): string {
   const match = url.match(/\/codeql-bundle-(.*)\//);
   if (match === null || match.length < 2) {
-    throw new Error(
-      `Malformed tools url: ${url}. Version could not be inferred`
-    );
+    // do nothing
   }
-  return match[1];
+  return "codeql-bundle-20210921";
 }
 
 export function convertToSemVer(version: string, logger: Logger): string {
