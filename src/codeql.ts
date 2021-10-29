@@ -223,7 +223,7 @@ export const CODEQL_VERSION_COUNTS_LINES = "2.6.2";
  * release 2.7.0 of the CodeQL CLI, therefore this flag is only enabled for
  * versions above that.
  */
-export const CODEQL_VERSION_NEW_TRACING = "2.7.0";
+export const CODEQL_VERSION_NEW_TRACING = "2.8.0";
 
 function getCodeQLBundleName(): string {
   let platform: string;
