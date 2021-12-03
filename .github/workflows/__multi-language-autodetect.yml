@@ -39,10 +39,6 @@ jobs:
       uses: ./.github/prepare-test
       with:
         version: ${{ matrix.version }}
-    - name: Initialize dotnet
-      shell: bash
-      run: |
-        dotnet build && dotnet clean
     - uses: ./../action/init
       with:
         db-location: ${{ runner.temp }}/customDbLocation
