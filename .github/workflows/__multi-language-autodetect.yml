@@ -46,9 +46,6 @@ jobs:
       run: ./build.sh
     - shell: bash
       run: |
-        dotnet dev-certs https --trust
-    - shell: bash
-      run: |
         dotnet clean
     - uses: ./../action/init
       with:
