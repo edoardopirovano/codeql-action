@@ -50,6 +50,7 @@ jobs:
     - shell: bash
       run: |
         dotnet clean
+        rm -rf bin obj
     - uses: ./../action/init
       with:
         db-location: ${{ runner.temp }}/customDbLocation
