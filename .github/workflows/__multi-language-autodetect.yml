@@ -47,6 +47,9 @@ jobs:
     - shell: bash
       run: |
         dotnet dev-certs https --trust
+    - shell: bash
+      run: |
+        dotnet clean
     - uses: ./../action/init
       with:
         db-location: ${{ runner.temp }}/customDbLocation
