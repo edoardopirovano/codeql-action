@@ -2,7 +2,7 @@
 
 gcc -o main main.c
 
-dotnet build -p:UseSharedCompilation=false
+#dotnet build -p:UseSharedCompilation=false
 
 javac Main.java
 
