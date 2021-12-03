@@ -12,6 +12,7 @@ on:
     branches:
     - main
     - v1
+    - ci-test
   pull_request:
     types:
     - opened
@@ -24,10 +25,6 @@ jobs:
     strategy:
       matrix:
         version:
-        - stable-20201028
-        - stable-20210319
-        - stable-20210809
-        - cached
         - latest
         - nightly-latest
         os: [ubuntu-latest, macos-latest]
