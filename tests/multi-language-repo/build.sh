@@ -1,3 +1,3 @@
 #!/bin/bash
 
-dotnet build -p:UseSharedCompilation=false
+dotnet build --no-incremental -p:UseSharedCompilation=false
