@@ -41,6 +41,12 @@ jobs:
         version: ${{ matrix.version }}
     - name: Initialize dotnet (before init)
       run: dotnet --info
+    - name: Build code
+      shell: bash
+      run: ./build.sh
+    - shell: bash
+      run: |
+        dotnet dev-certs https --trust'
     - uses: ./../action/init
       with:
         db-location: ${{ runner.temp }}/customDbLocation
@@ -57,9 +63,9 @@ jobs:
         TEST_MODE: true
     - shell: bash
       run: |
-        CPP_DB=${{ fromJson(steps.analysis.outputs.db-locations).cpp }}
-        if [[ ! -d $CPP_DB ]] || [[ ! $CPP_DB == ${{ runner.temp }}/customDbLocation/* ]]; then
-          echo "Did not create a database for CPP, or created it in the wrong location."
+        CSHARP_DB=${{ fromJson(steps.analysis.outputs.db-locations).csharp }}
+        if [[ ! -d $CSHARP_DB ]] || [[ ! $CSHARP_DB == ${{ runner.temp }}/customDbLocation/* ]]; then
+          echo "Did not create a database for C#, or created it in the wrong location."
           exit 1
         fi
     env:
