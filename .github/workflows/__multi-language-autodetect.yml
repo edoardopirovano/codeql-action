@@ -46,7 +46,7 @@ jobs:
       run: ./build.sh
     - shell: bash
       run: |
-        dotnet dev-certs https --trust'
+        dotnet dev-certs https --trust
     - uses: ./../action/init
       with:
         db-location: ${{ runner.temp }}/customDbLocation
