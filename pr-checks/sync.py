@@ -1,5 +1,6 @@
 import ruamel.yaml
 import os
+from functools import reduce 
 
 defaultTestVersions = [
     # The oldest supported CodeQL version: 2.3.1. If bumping, update `CODEQL_MINIMUM_VERSION` in `codeql.ts`
@@ -23,6 +24,7 @@ header = """# Warning: This file is generated automatically, and should not be m
 
 """
 
+checksPerWorkflow = 100
 
 class NonAliasingRTRepresenter(ruamel.yaml.representer.RoundTripRepresenter):
     def ignore_aliases(self, data):
@@ -33,9 +35,23 @@ def writeHeader(checkStream):
     checkStream.write(header)
 
 
+def split(jobs):
+    result = []
+    index = 0
+    partial = []
+    while index < len(jobs):
+        partial.append(jobs[index])
+        index += 1
+        if (index % checksPerWorkflow) == 0:
+            result.append(partial)
+            partial = []
+    if len(partial) > 0:
+        result.append(partial)
+    return result
+
 yaml = ruamel.yaml.YAML()
 yaml.Representer = NonAliasingRTRepresenter
-allJobs = {}
+allJobs = []
 for file in os.listdir('checks'):
     with open(f"checks/{file}", 'r') as checkStream:
         checkSpecification = yaml.load(checkStream)
@@ -82,11 +98,14 @@ for file in os.listdir('checks'):
     checkJob['env'] = checkJob.get('env', {})
     checkJob['env']['INTERNAL_CODEQL_ACTION_DEBUG_LOC'] = True
     checkName = file[:len(file) - 4]
+    allJobs.append({checkName: checkJob})
 
-    with open(f"../.github/workflows/__{checkName}.yml", 'w') as output_stream:
+workflowNum = 1
+for jobs in split(allJobs):
+    with open(f"../.github/workflows/__pr-checks-{workflowNum}.yml", 'w') as output_stream:
         writeHeader(output_stream)
         yaml.dump({
-            'name': f"PR Check - {checkSpecification['name']}",
+            'name': f"PR Checks {workflowNum}",
             'env': {
                 'GITHUB_TOKEN': '${{ secrets.GITHUB_TOKEN }}',
                 'GO111MODULE': 'auto',
@@ -100,7 +119,5 @@ for file in os.listdir('checks'):
                 },
                 'workflow_dispatch': {}
             },
-            'jobs': {
-                checkName: checkJob
-            }
+            'jobs': reduce(lambda a, b: dict(a, **b), jobs)
         }, output_stream)

@@ -1,0 +1,805 @@
+# Warning: This file is generated automatically, and should not be modified.
+# Instead, please modify the template in the pr-checks directory and run:
+#     pip install ruamel.yaml && python3 sync.py
+# to regenerate this file.
+
+name: PR Checks 1
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GO111MODULE: auto
+on:
+  push:
+    branches:
+    - main
+    - v1
+    - test-pr-checks
+  pull_request:
+    types:
+    - opened
+    - synchronize
+    - reopened
+    - ready_for_review
+  workflow_dispatch: {}
+jobs:
+  packaging-inputs-js:
+    strategy:
+      matrix:
+        version: [nightly-20210831] # This CLI version is known to work with package used in this test
+        os: [ubuntu-latest, macos-latest]
+    name: 'Packaging: Action input'
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - name: Initialize dotnet
+      run: dotnet restore
+    - uses: ./../action/init
+      with:
+        config-file: .github/codeql/codeql-config-packaging2.yml
+        languages: javascript
+        packs: dsp-testing/codeql-pack1@0.1.0, dsp-testing/codeql-pack2
+        tools: ${{ steps.prepare-test.outputs.tools-url }}
+    - name: Build code
+      shell: bash
+      run: ./build.sh
+    - uses: ./../action/analyze
+      with:
+        output: ${{ runner.temp }}/results
+      env:
+        TEST_MODE: true
+    - name: Assert Results
+      shell: bash
+      run: |
+        cd "$RUNNER_TEMP/results"
+        # We should have 3 hits from these rules
+        EXPECTED_RULES="javascript/example/empty-or-one-block javascript/example/empty-or-one-block javascript/example/two-block"
+
+        # use tr to replace newlines with spaces and xargs to trim leading and trailing whitespace
+        RULES="$(cat javascript.sarif | jq -r '.runs[0].results[].ruleId' | sort | tr "\n" " " | xargs)"
+        echo "Found matching rules '$RULES'"
+        if [ "$RULES" != "$EXPECTED_RULES" ]; then
+          echo "Did not match expected rules '$EXPECTED_RULES'."
+          exit 1
+        fi
+    env:
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+  javascript-source-root:
+    strategy:
+      matrix:
+        version: [latest, cached, nightly-latest] # This feature is not compatible with old CLIs
+        os: [ubuntu-latest]
+    name: Custom source root
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - name: Move codeql-action
+      shell: bash
+      run: |
+        mkdir ../new-source-root
+        mv * ../new-source-root
+    - uses: ./../action/init
+      with:
+        languages: javascript
+        source-root: ../new-source-root
+        tools: ${{ steps.prepare-test.outputs.tools-url }}
+    - uses: ./../action/analyze
+      with:
+        skip-queries: true
+        upload: false
+    - name: Assert database exists
+      shell: bash
+      run: |
+        cd "$RUNNER_TEMP/codeql_databases"
+        if [[ ! -d javascript ]]; then
+          echo "Did not find a JavaScript database"
+          exit 1
+        fi
+    env:
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+  split-workflow:
+    strategy:
+      matrix:
+        version: [nightly-20210831] # This CLI version is known to work with package used in this test
+        os: [ubuntu-latest, macos-latest]
+    name: Split workflow
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - name: Initialize dotnet
+      run: dotnet restore
+    - uses: ./../action/init
+      with:
+        config-file: .github/codeql/codeql-config-packaging3.yml
+        packs: +dsp-testing/codeql-pack1@0.1.0
+        languages: javascript
+        tools: ${{ steps.prepare-test.outputs.tools-url }}
+    - name: Build code
+      shell: bash
+      run: ./build.sh
+    - uses: ./../action/analyze
+      with:
+        skip-queries: true
+        output: ${{ runner.temp }}/results
+      env:
+        TEST_MODE: true
+    - name: Assert No Results
+      shell: bash
+      run: |
+        if [ "$(ls -A $RUNNER_TEMP/results)" ]; then
+          echo "Expected results directory to be empty after skipping query execution!"
+          exit 1
+        fi
+    - uses: ./../action/analyze
+      with:
+        output: ${{ runner.temp }}/results
+        upload-database: false
+      env:
+        TEST_MODE: true
+    - name: Assert Results
+      shell: bash
+      run: |
+        cd "$RUNNER_TEMP/results"
+        # We should have 3 hits from these rules
+        EXPECTED_RULES="javascript/example/empty-or-one-block javascript/example/empty-or-one-block javascript/example/two-block"
+
+        # use tr to replace newlines with spaces and xargs to trim leading and trailing whitespace
+        RULES="$(cat javascript.sarif | jq -r '.runs[0].results[].ruleId' | sort | tr "\n" " " | xargs)"
+        echo "Found matching rules '$RULES'"
+        if [ "$RULES" != "$EXPECTED_RULES" ]; then
+          echo "Did not match expected rules '$EXPECTED_RULES'."
+          exit 1
+        fi
+    env:
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+  go-custom-queries:
+    strategy:
+      matrix:
+        version:
+        - stable-20201028
+        - stable-20210319
+        - stable-20210809
+        - cached
+        - latest
+        - nightly-latest
+        os:
+        - ubuntu-latest
+        - macos-latest
+        - windows-latest
+    name: 'Go: Custom queries'
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - name: Initialize dotnet
+      run: dotnet restore
+    - uses: actions/setup-go@v2
+      with:
+        go-version: ^1.13.1
+    - uses: ./../action/init
+      with:
+        languages: go
+        config-file: ./.github/codeql/custom-queries.yml
+        tools: ${{ steps.prepare-test.outputs.tools-url }}
+    - name: Build code
+      shell: bash
+      run: ./build.sh
+    - uses: ./../action/analyze
+      env:
+        TEST_MODE: true
+    env:
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+  test-proxy:
+    strategy:
+      matrix:
+        version: [latest]
+        os: [ubuntu-latest]
+    name: Proxy test
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - uses: ./../action/init
+      with:
+        languages: javascript
+        tools: ${{ steps.prepare-test.outputs.tools-url }}
+    - uses: ./../action/analyze
+      env:
+        TEST_MODE: true
+    env:
+      https_proxy: http://squid-proxy:3128
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+    container:
+      image: ubuntu:18.04
+      options: --dns 127.0.0.1
+    services:
+      squid-proxy:
+        image: datadog/squid:latest
+        ports:
+        - 3128:3128
+  remote-config:
+    strategy:
+      matrix:
+        version:
+        - stable-20201028
+        - stable-20210319
+        - stable-20210809
+        - cached
+        - latest
+        - nightly-latest
+        os:
+        - ubuntu-latest
+        - macos-latest
+        - windows-latest
+    name: Remote config file
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - name: Initialize dotnet
+      run: dotnet restore
+    - uses: ./../action/init
+      with:
+        tools: ${{ steps.prepare-test.outputs.tools-url }}
+        languages: cpp,csharp,java,javascript,python
+        config-file: github/codeql-action/tests/multi-language-repo/.github/codeql/custom-queries.yml@${{
+          github.sha }}
+    - name: Build code
+      shell: bash
+      run: ./build.sh
+    - uses: ./../action/analyze
+      env:
+        TEST_MODE: true
+    env:
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+  unset-environment:
+    strategy:
+      matrix:
+        version:
+        - stable-20201028
+        - stable-20210319
+        - stable-20210809
+        - cached
+        - latest
+        - nightly-latest
+        os: [ubuntu-latest]
+    name: Test unsetting environment variables
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - name: Initialize dotnet
+      run: dotnet restore
+    - uses: ./../action/init
+      with:
+        db-location: ${{ runner.temp }}/customDbLocation
+        tools: ${{ steps.prepare-test.outputs.tools-url }}
+    - name: Build code
+      shell: bash
+      run: env -i PATH="$PATH" HOME="$HOME" ./build.sh
+    - uses: ./../action/analyze
+      id: analysis
+      env:
+        TEST_MODE: true
+    - shell: bash
+      run: |
+        CPP_DB=${{ fromJson(steps.analysis.outputs.db-locations).cpp }}
+        if [[ ! -d $CPP_DB ]] || [[ ! $CPP_DB == ${{ runner.temp }}/customDbLocation/* ]]; then
+          echo "Did not create a database for CPP, or created it in the wrong location."
+          exit 1
+        fi
+        CSHARP_DB=${{ fromJson(steps.analysis.outputs.db-locations).csharp }}
+        if [[ ! -d $CSHARP_DB ]] || [[ ! $CSHARP_DB == ${{ runner.temp }}/customDbLocation/* ]]; then
+          echo "Did not create a database for C Sharp, or created it in the wrong location."
+          exit 1
+        fi
+        GO_DB=${{ fromJson(steps.analysis.outputs.db-locations).go }}
+        if [[ ! -d $GO_DB ]] || [[ ! $GO_DB == ${{ runner.temp }}/customDbLocation/* ]]; then
+          echo "Did not create a database for Go, or created it in the wrong location."
+          exit 1
+        fi
+        JAVA_DB=${{ fromJson(steps.analysis.outputs.db-locations).java }}
+        if [[ ! -d $JAVA_DB ]] || [[ ! $JAVA_DB == ${{ runner.temp }}/customDbLocation/* ]]; then
+          echo "Did not create a database for Java, or created it in the wrong location."
+          exit 1
+        fi
+        JAVASCRIPT_DB=${{ fromJson(steps.analysis.outputs.db-locations).javascript }}
+        if [[ ! -d $JAVASCRIPT_DB ]] || [[ ! $JAVASCRIPT_DB == ${{ runner.temp }}/customDbLocation/* ]]; then
+          echo "Did not create a database for Javascript, or created it in the wrong location."
+          exit 1
+        fi
+        PYTHON_DB=${{ fromJson(steps.analysis.outputs.db-locations).python }}
+        if [[ ! -d $PYTHON_DB ]] || [[ ! $PYTHON_DB == ${{ runner.temp }}/customDbLocation/* ]]; then
+          echo "Did not create a database for Python, or created it in the wrong location."
+          exit 1
+        fi
+    env:
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+  test-local-codeql:
+    strategy:
+      matrix:
+        version: [nightly-latest]
+        os: [ubuntu-latest]
+    name: Local CodeQL bundle
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - name: Initialize dotnet
+      run: dotnet restore
+    - name: Fetch a CodeQL bundle
+      shell: bash
+      env:
+        CODEQL_URL: ${{ steps.prepare-test.outputs.tools-url }}
+      run: |
+        wget "$CODEQL_URL"
+    - uses: ./../action/init
+      with:
+        tools: ./codeql-bundle.tar.gz
+    - name: Build code
+      shell: bash
+      run: ./build.sh
+    - uses: ./../action/analyze
+      env:
+        TEST_MODE: true
+    env:
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+  rubocop-multi-language:
+    strategy:
+      matrix:
+        version:
+        - stable-20201028
+        - stable-20210319
+        - stable-20210809
+        - cached
+        - latest
+        - nightly-latest
+        os: [ubuntu-latest]
+    name: RuboCop multi-language
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 2.6
+    - name: Install Code Scanning integration
+      shell: bash
+      run: bundle add code-scanning-rubocop --version 0.3.0 --skip-install
+    - name: Install dependencies
+      shell: bash
+      run: bundle install
+    - name: RuboCop run
+      shell: bash
+      run: |
+        bash -c "
+          bundle exec rubocop --require code_scanning --format CodeScanning::SarifFormatter -o rubocop.sarif
+          [[ $? -ne 2 ]]
+        "
+    - uses: ./../action/upload-sarif
+      with:
+        sarif_file: rubocop.sarif
+      env:
+        TEST_MODE: true
+    env:
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+  go-custom-tracing:
+    strategy:
+      matrix:
+        version:
+        - stable-20201028
+        - stable-20210319
+        - stable-20210809
+        - cached
+        - latest
+        - nightly-latest
+        os:
+        - ubuntu-latest
+        - macos-latest
+        - windows-latest
+    name: 'Go: Custom tracing'
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - uses: actions/setup-go@v2
+      with:
+        go-version: ^1.13.1
+    - uses: ./../action/init
+      with:
+        languages: go
+        tools: ${{ steps.prepare-test.outputs.tools-url }}
+    - name: Build code
+      shell: bash
+      run: go build main.go
+    - uses: ./../action/analyze
+      env:
+        TEST_MODE: true
+    env:
+      CODEQL_EXTRACTOR_GO_BUILD_TRACING: 'true'
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+  packaging-config-js:
+    strategy:
+      matrix:
+        version: [nightly-20210831] # This CLI version is known to work with package used in this test
+        os: [ubuntu-latest, macos-latest]
+    name: 'Packaging: Config file'
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - name: Initialize dotnet
+      run: dotnet restore
+    - uses: ./../action/init
+      with:
+        config-file: .github/codeql/codeql-config-packaging.yml
+        languages: javascript
+        tools: ${{ steps.prepare-test.outputs.tools-url }}
+    - name: Build code
+      shell: bash
+      run: ./build.sh
+    - uses: ./../action/analyze
+      with:
+        output: ${{ runner.temp }}/results
+      env:
+        TEST_MODE: true
+    - name: Assert Results
+      shell: bash
+      run: |
+        cd "$RUNNER_TEMP/results"
+        # We should have 3 hits from these rules
+        EXPECTED_RULES="javascript/example/empty-or-one-block javascript/example/empty-or-one-block javascript/example/two-block"
+
+        # use tr to replace newlines with spaces and xargs to trim leading and trailing whitespace
+        RULES="$(cat javascript.sarif | jq -r '.runs[0].results[].ruleId' | sort | tr "\n" " " | xargs)"
+        echo "Found matching rules '$RULES'"
+        if [ "$RULES" != "$EXPECTED_RULES" ]; then
+          echo "Did not match expected rules '$EXPECTED_RULES'."
+          exit 1
+        fi
+    env:
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+  extractor-ram-threads:
+    strategy:
+      matrix:
+        version: [latest]
+        os: [ubuntu-latest]
+    name: Extractor ram and threads options test
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - uses: ./../action/init
+      with:
+        languages: java
+        ram: 230
+        threads: 1
+    - name: Assert Results
+      shell: bash
+      run: |
+        if [ "${CODEQL_RAM}" != "230" ]; then
+          echo "CODEQL_RAM is '${CODEQL_RAM}' instead of 230"
+          exit 1
+        fi
+        if [ "${CODEQL_EXTRACTOR_JAVA_RAM}" != "230" ]; then
+          echo "CODEQL_EXTRACTOR_JAVA_RAM is '${CODEQL_EXTRACTOR_JAVA_RAM}' instead of 230"
+          exit 1
+        fi
+        if [ "${CODEQL_THREADS}" != "1" ]; then
+          echo "CODEQL_THREADS is '${CODEQL_THREADS}' instead of 1"
+          exit 1
+        fi
+        if [ "${CODEQL_EXTRACTOR_JAVA_THREADS}" != "1" ]; then
+          echo "CODEQL_EXTRACTOR_JAVA_THREADS is '${CODEQL_EXTRACTOR_JAVA_THREADS}' instead of 1"
+          exit 1
+        fi
+    env:
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+  go-custom-tracing-autobuild:
+    strategy:
+      matrix:
+        version:
+        - stable-20201028
+        - stable-20210319
+        - stable-20210809
+        - cached
+        - latest
+        - nightly-latest
+        os: [ubuntu-latest, macos-latest]
+    name: 'Go: Autobuild custom tracing'
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - uses: actions/setup-go@v2
+      with:
+        go-version: ^1.13.1
+    - uses: ./../action/init
+      with:
+        languages: go
+        tools: ${{ steps.prepare-test.outputs.tools-url }}
+    - uses: ./../action/autobuild
+    - uses: ./../action/analyze
+      env:
+        TEST_MODE: true
+    - shell: bash
+      run: |
+        cd "$RUNNER_TEMP/codeql_databases"
+        if [[ ! -d go ]]; then
+          echo "Did not find a Go database"
+          exit 1
+        fi
+    env:
+      CODEQL_EXTRACTOR_GO_BUILD_TRACING: 'true'
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+  multi-language-autodetect:
+    strategy:
+      matrix:
+        version:
+        - stable-20201028
+        - stable-20210319
+        - stable-20210809
+        - cached
+        - latest
+        - nightly-latest
+        os: [ubuntu-latest, macos-latest]
+    name: Multi-language repository
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - name: Initialize dotnet
+      run: dotnet restore
+    - uses: ./../action/init
+      with:
+        db-location: ${{ runner.temp }}/customDbLocation
+        tools: ${{ steps.prepare-test.outputs.tools-url }}
+    - name: Build code
+      shell: bash
+      run: ./build.sh
+    - uses: ./../action/analyze
+      id: analysis
+      env:
+        TEST_MODE: true
+    - shell: bash
+      run: |
+        CPP_DB=${{ fromJson(steps.analysis.outputs.db-locations).cpp }}
+        if [[ ! -d $CPP_DB ]] || [[ ! $CPP_DB == ${{ runner.temp }}/customDbLocation/* ]]; then
+          echo "Did not create a database for CPP, or created it in the wrong location."
+          exit 1
+        fi
+        CSHARP_DB=${{ fromJson(steps.analysis.outputs.db-locations).csharp }}
+        if [[ ! -d $CSHARP_DB ]] || [[ ! $CSHARP_DB == ${{ runner.temp }}/customDbLocation/* ]]; then
+          echo "Did not create a database for C Sharp, or created it in the wrong location."
+          exit 1
+        fi
+        GO_DB=${{ fromJson(steps.analysis.outputs.db-locations).go }}
+        if [[ ! -d $GO_DB ]] || [[ ! $GO_DB == ${{ runner.temp }}/customDbLocation/* ]]; then
+          echo "Did not create a database for Go, or created it in the wrong location."
+          exit 1
+        fi
+        JAVA_DB=${{ fromJson(steps.analysis.outputs.db-locations).java }}
+        if [[ ! -d $JAVA_DB ]] || [[ ! $JAVA_DB == ${{ runner.temp }}/customDbLocation/* ]]; then
+          echo "Did not create a database for Java, or created it in the wrong location."
+          exit 1
+        fi
+        JAVASCRIPT_DB=${{ fromJson(steps.analysis.outputs.db-locations).javascript }}
+        if [[ ! -d $JAVASCRIPT_DB ]] || [[ ! $JAVASCRIPT_DB == ${{ runner.temp }}/customDbLocation/* ]]; then
+          echo "Did not create a database for Javascript, or created it in the wrong location."
+          exit 1
+        fi
+        PYTHON_DB=${{ fromJson(steps.analysis.outputs.db-locations).python }}
+        if [[ ! -d $PYTHON_DB ]] || [[ ! $PYTHON_DB == ${{ runner.temp }}/customDbLocation/* ]]; then
+          echo "Did not create a database for Python, or created it in the wrong location."
+          exit 1
+        fi
+    env:
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+  packaging-config-inputs-js:
+    strategy:
+      matrix:
+        version: [nightly-20210831] # This CLI version is known to work with package used in this test
+        os: [ubuntu-latest, macos-latest]
+    name: 'Packaging: Config and input'
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - name: Initialize dotnet
+      run: dotnet restore
+    - uses: ./../action/init
+      with:
+        config-file: .github/codeql/codeql-config-packaging3.yml
+        packs: +dsp-testing/codeql-pack1@0.1.0
+        languages: javascript
+        tools: ${{ steps.prepare-test.outputs.tools-url }}
+    - name: Build code
+      shell: bash
+      run: ./build.sh
+    - uses: ./../action/analyze
+      with:
+        output: ${{ runner.temp }}/results
+      env:
+        TEST_MODE: true
+    - name: Assert Results
+      shell: bash
+      run: |
+        cd "$RUNNER_TEMP/results"
+        # We should have 3 hits from these rules
+        EXPECTED_RULES="javascript/example/empty-or-one-block javascript/example/empty-or-one-block javascript/example/two-block"
+
+        # use tr to replace newlines with spaces and xargs to trim leading and trailing whitespace
+        RULES="$(cat javascript.sarif | jq -r '.runs[0].results[].ruleId' | sort | tr "\n" " " | xargs)"
+        echo "Found matching rules '$RULES'"
+        if [ "$RULES" != "$EXPECTED_RULES" ]; then
+          echo "Did not match expected rules '$EXPECTED_RULES'."
+          exit 1
+        fi
+    env:
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+  test-ruby:
+    strategy:
+      matrix:
+        version: [latest, cached, nightly-latest]
+        os: [ubuntu-latest, macos-latest]
+    name: Ruby analysis
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - uses: ./../action/init
+      with:
+        languages: ruby
+        tools: ${{ steps.prepare-test.outputs.tools-url }}
+    - uses: ./../action/analyze
+      id: analysis
+      env:
+        TEST_MODE: true
+    - name: Check database
+      shell: bash
+      run: |
+        RUBY_DB="${{ fromJson(steps.analysis.outputs.db-locations).ruby }}"
+        if [[ ! -d "$RUBY_DB" ]]; then
+          echo "Did not create a database for Ruby."
+          exit 1
+        fi
+    env:
+      CODEQL_ENABLE_EXPERIMENTAL_FEATURES: 'true'
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
+  debug-artifacts:
+    strategy:
+      matrix:
+        version:
+        - stable-20201028
+        - stable-20210319
+        - stable-20210809
+        - cached
+        - latest
+        - nightly-latest
+        os: [ubuntu-latest, macos-latest]
+    name: Debug artifact upload
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v2
+    - name: Prepare test
+      id: prepare-test
+      uses: ./.github/prepare-test
+      with:
+        version: ${{ matrix.version }}
+    - name: Initialize dotnet
+      run: dotnet restore
+    - uses: ./../action/init
+      with:
+        tools: ${{ steps.prepare-test.outputs.tools-url }}
+        debug: true
+    - name: Build code
+      shell: bash
+      run: ./build.sh
+    - uses: ./../action/analyze
+      id: analysis
+    - uses: actions/download-artifact@v2
+      with:
+        name: debug-artifacts-${{ matrix.os }}-${{ matrix.version }}
+    - shell: bash
+      run: |
+        LANGUAGES="cpp csharp go java javascript python"
+        for language in $LANGUAGES; do
+          echo "Checking $language"
+          if [[ ! -f "$language.sarif" ]] ; then
+            echo "Missing a SARIF file for $language"
+            exit 1
+          fi
+          if [[ ! -f "$language.zip" ]] ; then
+            echo "Missing a database bundle for $language"
+            exit 1
+          fi
+          if [[ ! -d "$language/log" ]] ; then
+            echo "Missing logs for $language"
+            exit 1
+          fi
+        done
+    env:
+      INTERNAL_CODEQL_ACTION_DEBUG_LOC: true
