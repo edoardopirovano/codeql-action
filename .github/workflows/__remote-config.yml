@@ -12,6 +12,7 @@ on:
     branches:
     - main
     - v1
+    - edoardo/test-config
   pull_request:
     types:
     - opened
@@ -24,13 +25,8 @@ jobs:
     strategy:
       matrix:
         version:
-        - stable-20201028
-        - stable-20210319
-        - stable-20210809
-        - cached
-        - latest
         - nightly-latest
-        os: [ubuntu-latest, macos-latest, windows-2019]
+        os: [ubuntu-latest]
     name: Remote config file
     runs-on: ${{ matrix.os }}
     steps:
@@ -45,8 +41,13 @@ jobs:
       with:
         tools: ${{ steps.prepare-test.outputs.tools-url }}
         languages: cpp,csharp,java,javascript,python
+        debug: true
         config-file: ${{ github.repository }}/tests/multi-language-repo/.github/codeql/custom-queries.yml@${{
           github.sha }}
+    - uses: actions/upload-artifact@v2
+      with:
+        name: qls-artifact
+        path: ${{ runner.temp }}/codeql_databases/csharp/temp/config-queries.qls
     - name: Build code
       shell: bash
       run: ./build.sh
